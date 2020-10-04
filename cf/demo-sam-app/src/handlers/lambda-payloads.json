@@ -1,0 +1,10 @@
+{
+    "helloFromLambdaFunction": {
+        "lambda": {}
+    }: {
+        "lambda": {
+            "id": "1",
+            "name": "johndeere"
+        }
+    }
+}
