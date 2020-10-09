@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >
+  A basic CloudFormation template for creating S3 bucekt. Uses Parameters , Instrinsic functions !Ref, !Sub ,Output features of cf
+
+Parameters:
+  BucketNameParameter:
+    Type: String
+    Description: BucketName 
+
+Resources:
+  S3Bucket:
+   Type: AWS::S3::Bucket
+   Properties:
+    BucketName : !Ref BucketNameParameter
+    Tags:
+       - Key: Name
+         Value: !Sub S3Bucket    
+
+Outputs:
+  S3Bucket:
+    Value: !Ref S3Bucket
+    Description: S3 Bucket Name
+     
+  
+    
