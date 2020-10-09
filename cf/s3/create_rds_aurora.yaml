@@ -1,0 +1,229 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >
+  A basic CloudFormation template for an RDS Aurora cluster.
+
+Parameters:
+  BackupRetentionPeriodParam:
+    ConstraintDescription: must be between 1 to 35 
+    Description: The days for which automated snapshots should be kept
+    MinValue: 1
+    MaxValue : 35
+    Default: 14
+    Type: Number
+
+  DatabaseUsername:
+    AllowedPattern: "[a-zA-Z0-9]+"
+    ConstraintDescription: must be between 1 to 16 alphanumeric characters.
+    Description: The database admin account user name, between 1 to 16 alphanumeric characters.
+    MaxLength: '16'
+    MinLength: '1'
+    Default: "admin"
+    Type: String
+  DatabasePassword:
+    AllowedPattern: "[a-zA-Z0-9]+"
+    ConstraintDescription: must be between 8 to 41 alphanumeric characters.
+    Description: The database admin account password, between 8 to 41 alphanumeric characters.
+    MaxLength: '41'
+    MinLength: '8'
+    NoEcho: 'true'
+    Type: String
+
+  DBSubnetGroupNameParam:
+    Description : SubnetGroupName
+    ConstraintDescription: Must contain no more than 255 lowercase alphanumeric characters or hyphens
+    MaxLength: '255'
+    Type: String
+
+  
+  pDBSubnetId:
+    Description : Select 2 Private Subnets one each from different AZ
+    Type: List<AWS::EC2::Subnet::Id>
+
+  pEngineVersion :
+   Description: EngineVersion
+   Type: String
+   Default: 5.7.12
+
+  DBInstanceClass:
+   Description: Choose the DBInstanceClass
+   Type: String
+   AllowedValues: 
+      - db.t3.small
+      - db.r5.large
+   Default: db.t3.small   
+
+  DBClusterIdentifierParam:
+    Description: Cluster Identifier
+    Type: String
+    ConstraintDescription: Must contain from 1 to 63 letters, numbers, or hyphens.First character must be a letter. Cannot end with a hyphen or contain two consecutive hyphens
+    Default: db-cluster-name
+
+  SecurityGroupsParam: 
+    Type: AWS::EC2::SecurityGroup::Id
+
+  StackAlarmTopic:
+    Description: Specify the existing SNS topic ARN
+    ConstraintDescription: ARN should be of the form "arn:aws:sns:ap-south-1:123456789012:my_sns_topic"
+    Type: String
+
+
+
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Cluster Configuration
+        Parameters:
+          - DBClusterIdentifierParam  
+      - Label:
+          default: DB Engine Configuration
+        Parameters:
+          - DBInstanceClass
+          - pEngineVersion
+          
+      - Label:
+          default: Database Security Configuration
+        Parameters:
+          - DatabaseUsername
+          - DatabasePassword
+          - DBSubnetGroupNameParam
+          - pDBSubnetId
+          - SecurityGroupsParam
+      
+      - Label:
+          default: Database Backup Configuration
+        Parameters:
+          - BackupRetentionPeriodParam
+
+      - Label:
+          default: Monitoring Configuration
+        Parameters:
+          - StackAlarmTopic
+      
+    ParameterLabels:
+      DatabaseUsername:
+        default: Database Username
+      DatabasePassword:
+        default: Database Password
+      DBSubnetGroupNameParam:
+       default: DB Subnet Group Name
+      pDBSubnetId:
+       default: DB Subnet Ids
+      pEngineVersion:
+       default: Engine Version (e.g. 5.7.12)
+
+
+Resources:
+  RDSCluster: 
+   Type: "AWS::RDS::DBCluster"
+   Properties: 
+    BackupRetentionPeriod: !Ref BackupRetentionPeriodParam
+    DBClusterIdentifier:
+     Ref: DBClusterIdentifierParam
+    DBClusterParameterGroupName: 
+      Ref: RDSDBClusterParameterGroup
+    DBSubnetGroupName: 
+      Ref: DBSubnetGroup
+    EnableCloudwatchLogsExports: 
+     - error
+     - slowquery
+    Engine: aurora-mysql
+    EngineVersion: 
+     Ref: pEngineVersion
+    MasterUserPassword: 
+      Ref: DatabasePassword
+    MasterUsername: 
+      Ref: DatabaseUsername
+    PreferredMaintenanceWindow: sun:01:00-sun:02:00
+    VpcSecurityGroupIds: 
+      - !Ref SecurityGroupsParam 
+
+  RDSDBClusterParameterGroup: 
+   Type: "AWS::RDS::DBClusterParameterGroup"
+   Properties: 
+    Description: "CloudFormation Sample Aurora Cluster Parameter Group"
+    Family: aurora-mysql5.7
+    Parameters: 
+      time_zone: Asia/Calcutta
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: CloudFormation managed DB subnet group.
+      DBSubnetGroupName: 
+       Ref: DBSubnetGroupNameParam
+      SubnetIds: 
+       Ref: pDBSubnetId
+
+  RDSDBInstance: 
+    Type: "AWS::RDS::DBInstance"
+    Properties:
+     AllowMajorVersionUpgrade: false
+     AutoMinorVersionUpgrade: false
+     DBClusterIdentifier: 
+      Ref: RDSCluster
+     DBInstanceClass: !Ref DBInstanceClass
+     DBSubnetGroupName: 
+      Ref: DBSubnetGroup
+     Engine: aurora-mysql
+     PubliclyAccessible: "false"
+
+  RDSDBInstancePrimaryCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Primary database CPU utilization is over 80%.
+      Namespace: AWS/RDS
+      MetricName: CPUUtilization
+      Unit: Percent
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref RDSDBInstance
+      AlarmActions:
+        - Ref: StackAlarmTopic
+      InsufficientDataActions:
+        - Ref: StackAlarmTopic
+
+  RDSDBInstanceMemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Primary database freeable memory is under 700MB.
+      Namespace: AWS/RDS
+      MetricName: FreeableMemory
+      Unit: Bytes
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 700000000
+      ComparisonOperator: LessThanOrEqualToThreshold
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref RDSDBInstance
+      AlarmActions:
+        - Ref: StackAlarmTopic
+      InsufficientDataActions:
+        - Ref: StackAlarmTopic
+
+Outputs:
+ RDSCluster:
+  Value: !Ref RDSCluster
+  Description: RDSCluster  
+  Export:
+    Name: !Sub "${AWS::StackName}-RDSCluster"
+ 
+ RDSCluster:
+    Description: Cluster Endpoint
+    Value: !GetAtt RDSCluster.Endpoint.Address
+ 
+
+
+
+
+       
+    

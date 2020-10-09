@@ -1,0 +1,107 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >
+  A basic CloudFormation template for creating SNS topic for Monitoring & S3 Logging Bucket
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+  EmailParameter:
+    Type: String
+    Description: Specify valid email id   
+  BucketNameParameter:
+    Type: String
+    Description: BucketName for logging
+
+Metadata:
+  AWS::CloudFormation::Interface:
+   ParameterGroups: 
+      - 
+        Label: 
+          default: "Environment Configuration"
+        Parameters: 
+          - EnvironmentName
+           
+      - Label: 
+          default: "SNS Configuration"
+        Parameters: 
+          - EmailParameter
+      - 
+        Label: 
+          default: "S3 logging Configuration"
+        Parameters: 
+          - BucketNameParameter
+   
+   
+Resources:
+  SNSTopic: 
+    Type: AWS::SNS::Topic
+    Properties:
+     DisplayName: !Ref EnvironmentName
+          
+  Subscription:
+   Type: AWS::SNS::Subscription
+   Properties:
+    Endpoint: !Ref EmailParameter
+    Protocol: email
+    TopicArn: !Ref 'SNSTopic'
+  #S3 bucket for logging
+
+  S3LogBucket:
+   Type: AWS::S3::Bucket
+   DeletionPolicy: Retain
+   Properties:
+    BucketName : !Ref BucketNameParameter
+    Tags:
+       - Key: Name
+         Value: !Sub ${EnvironmentName}-S3LogBucket    
+
+  S3BucketPolicy:
+   Type: AWS::S3::BucketPolicy
+   Properties: 
+     Bucket: !Ref S3LogBucket
+     PolicyDocument: 
+      Version: '2012-10-17'
+      Statement:
+        - Sid: AllowELBAccountoPutObject
+          Effect: Allow
+          Principal:
+           #Allow ELB account (specific to region) access to bucket 
+           AWS: 'arn:aws:iam::718504428378:root'
+          Action: 's3:PutObject'
+          Resource: !Sub 'arn:aws:s3:::${S3LogBucket}/*'
+
+        - Sid: AllowLogDeliveryServicePutObject
+          Effect: Allow
+          Principal:
+            Service: 'delivery.logs.amazonaws.com'
+          Action: 's3:PutObject'
+          Resource: !Sub 'arn:aws:s3:::${S3LogBucket}/*'
+          Condition:
+            StringEquals:
+              's3:x-amz-acl': 'bucket-owner-full-control'
+
+        - Sid: AllowLogDeliveryServicePutObject
+          Effect: Allow
+          Principal:
+            Service: 'delivery.logs.amazonaws.com'
+          Action: 's3:GetBucketAcl'
+          Resource: !Sub 'arn:aws:s3:::${S3LogBucket}'
+  
+Outputs:
+  SNSTopic:
+    Value: !Ref SNSTopic
+    Description: S3 Bucket Name
+    Export:
+     Name: !Sub "${AWS::StackName}-SNSTopic"
+
+  S3LogBucket:
+    Value: !Ref S3LogBucket
+    Description: S3 Bucket Name
+    Export:
+     Name: !Sub "${AWS::StackName}-S3LogBucket"
+  
+     
+  
+    
