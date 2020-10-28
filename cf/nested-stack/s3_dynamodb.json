@@ -1,0 +1,30 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "BucketNameParam": {
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "childBucket": {
+            "Type": "AWS::S3::Bucket"
+        },
+        "NesteStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": "https://ak2810201103.s3.amazonaws.com/single_s3_bucket.json",
+                "Parameters": {
+                    "BucketNameParam": {
+                        "Ref": "BucketNameParam"
+                    }
+                }
+            }
+        },
+        "NesteDynamoDBStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": "https://ak2810201103.s3.amazonaws.com/dynamodb.json"
+            }
+        }
+    }
+}
