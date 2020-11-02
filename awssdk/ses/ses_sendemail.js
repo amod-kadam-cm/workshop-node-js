@@ -1,3 +1,15 @@
+/*
+Readme
+-------
+1. Ensure AWS Credentials are configured in your environment
+2. Ensure that you have all the required dependencies (aws-sdk),(logplease) used in the code
+3. SES is setup in the same region 
+4. All email ids ( SENDER_ADDRESS , CC_ADDRESS, TO_ADDRESS must be verified if you are using SES Sandbox)
+to be used 
+5. To invoke this code use 
+   node ses_sendemail.js <SENDER_ADDRESS> <TO_ADDRESS> <CC_ADDRESS> <REPLY_TO_ADDRESS>
+*/
+
 // Load the AWS SDK for Node.js
 var AWS = require('aws-sdk');
 
